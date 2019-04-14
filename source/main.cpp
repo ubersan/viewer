@@ -1,7 +1,7 @@
 #include "viewer.hpp"
 
 int main() {
-  auto viewer = Viewer();
+  Viewer viewer;
   viewer.run();
   
   return 0;

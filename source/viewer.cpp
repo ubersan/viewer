@@ -4,6 +4,8 @@
 Viewer::Viewer() {}
 
 Viewer::~Viewer() {
+  vkDestroyInstance(vkInstance, nullptr);
+
   glfwTerminate();
   glfwDestroyWindow(window);
 }
@@ -24,13 +26,17 @@ void Viewer::run() {
     .apiVersion = VK_API_VERSION_1_1
   };
 
+  auto glfwExtensionCount = uint32_t{0};
+  auto glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
   VkInstanceCreateInfo instanceCreateInfo = {
     .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-    .pApplicationInfo = &applicationInfo
+    .pApplicationInfo = &applicationInfo,
+    .enabledExtensionCount = glfwExtensionCount,
+    .ppEnabledExtensionNames = glfwExtensions
   };
 
-  VkInstance instance;
-  if (vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS) {
+  if (vkCreateInstance(&instanceCreateInfo, nullptr, &vkInstance) != VK_SUCCESS) {
     throw std::runtime_error("Could not create VK instance");
   }
 
