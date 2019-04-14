@@ -4,7 +4,10 @@
 #include <fstream>
 
 Viewer::~Viewer() {
+  vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
+  vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
+
 
   for (auto swapChainImageView : swapChainImageViews) {
     vkDestroyImageView(logicalDevice, swapChainImageView, nullptr);
@@ -148,6 +151,40 @@ void Viewer::run() {
     }
   }
 
+  VkAttachmentDescription attachmentDescription{
+    .format = surfaceFormat.format,
+    .samples = VK_SAMPLE_COUNT_1_BIT,
+    .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+    .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+    .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+    .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+  };
+
+  VkAttachmentReference attachmentReference{
+    .attachment = 0,
+    .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+  };
+
+  VkSubpassDescription subpassDescription{
+    .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    .colorAttachmentCount = 1,
+    .pColorAttachments = &attachmentReference
+  };
+
+  VkRenderPassCreateInfo renderPassCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .attachmentCount = 1,
+    .pAttachments = &attachmentDescription,
+    .subpassCount = 1,
+    .pSubpasses = &subpassDescription
+  };
+
+  if (vkCreateRenderPass(logicalDevice, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
+    throw std::runtime_error("Could not create render pass");   
+  }
+
   VkShaderModule vertexShaderModule, fragmentShaderModule;
   createShaderModuleFromBinary("../source/shaders/vert.spv", vertexShaderModule);
   createShaderModuleFromBinary("../source/shaders/frag.spv", fragmentShaderModule);
@@ -166,13 +203,10 @@ void Viewer::run() {
     .pName = "main"
   };
 
-  auto shaderStages = {
+  VkPipelineShaderStageCreateInfo shaderStages[] = {
     vertexShaderStageCreateInfo,
     fragmentShaderStageCreateInfo
   };
-
-  vkDestroyShaderModule(logicalDevice, fragmentShaderModule, nullptr);
-  vkDestroyShaderModule(logicalDevice, vertexShaderModule, nullptr);
 
   VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
     .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
@@ -248,6 +282,28 @@ void Viewer::run() {
   if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
     throw std::runtime_error("Could not create pipeline layout");
   }
+
+  VkGraphicsPipelineCreateInfo pipelineCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+    .stageCount = 2,
+    .pStages = shaderStages,
+    .pVertexInputState = &pipelineVertexInputStateCreateInfo,
+    .pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo,
+    .pViewportState = &pipelineViewportStateCreateInfo,
+    .pRasterizationState = &pipelineRasterizationStateCreateInfo,
+    .pMultisampleState = &pipelineMultisampleStateCreateInfo,
+    .pColorBlendState = &pipelineColorBlendStateCreateInfo,
+    .layout = pipelineLayout,
+    .renderPass = renderPass,
+    .subpass = 0
+  };
+
+  if (vkCreateGraphicsPipelines(logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline) != VK_SUCCESS) {
+    throw std::runtime_error("Could not create graphics pipeline");
+  }
+
+  vkDestroyShaderModule(logicalDevice, fragmentShaderModule, nullptr);
+  vkDestroyShaderModule(logicalDevice, vertexShaderModule, nullptr);
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
