@@ -105,6 +105,11 @@ void Viewer::run() {
     throw std::runtime_error("Could not create swap chain");
   }
 
+  auto swapChainImageCount = uint32_t{0};
+  vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, nullptr);
+  swapChainImages.resize(swapChainImageCount);
+  vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, swapChainImages.data());
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }

@@ -20,7 +20,9 @@ private:
   VkQueue graphicsQueue;
   VkSurfaceKHR surface;
   VkQueue presentationQueue;
+
   VkSwapchainKHR swapChain;
+  std::vector<VkImage> swapChainImages;
 
   std::vector<const char*> logicalDeviceExtensions{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
