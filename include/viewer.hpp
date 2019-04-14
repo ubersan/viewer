@@ -3,13 +3,15 @@
 
 class Viewer {
 public:
-  Viewer();
   ~Viewer();
 
   void run();
 private:
   GLFWwindow* window;
+
   VkInstance vkInstance;
+  VkPhysicalDevice physicalDevice;
+  VkDevice logicalDevice;
 
   static void exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 };
