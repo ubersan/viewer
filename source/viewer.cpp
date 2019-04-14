@@ -3,6 +3,10 @@
 #include <iostream>
 
 Viewer::~Viewer() {
+  for (auto swapChainImageView : swapChainImageViews) {
+    vkDestroyImageView(logicalDevice, swapChainImageView, nullptr);
+  }
+
   vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
   vkDestroyDevice(logicalDevice, nullptr);
   vkDestroySurfaceKHR(vkInstance, surface, nullptr);
@@ -109,6 +113,37 @@ void Viewer::run() {
   vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, nullptr);
   swapChainImages.resize(swapChainImageCount);
   vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, swapChainImages.data());
+
+  swapChainImageViews.resize(swapChainImages.size());
+  for (auto i{0}; i < swapChainImages.size(); i++) {
+    VkComponentMapping componentMapping{
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY
+    };
+
+    VkImageSubresourceRange imageSubResourceRange{
+      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel = 0,
+      .levelCount = 1,
+      .baseArrayLayer = 0,
+      .layerCount = 1
+    };
+
+    VkImageViewCreateInfo imageViewCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .image = swapChainImages[i],
+      .viewType = VK_IMAGE_VIEW_TYPE_2D,
+      .format = surfaceFormat.format,
+      .components = componentMapping,
+      .subresourceRange = imageSubResourceRange      
+    };
+
+    if (vkCreateImageView(logicalDevice, &imageViewCreateInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Could not create image view");
+    }
+  }
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
