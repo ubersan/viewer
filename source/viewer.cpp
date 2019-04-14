@@ -4,6 +4,12 @@
 #include <fstream>
 
 Viewer::~Viewer() {
+  vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
+
+  for (auto framebuffer : swapChainFramebuffers) {
+      vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
+  }
+
   vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
   vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
@@ -203,7 +209,7 @@ void Viewer::run() {
     .pName = "main"
   };
 
-  VkPipelineShaderStageCreateInfo shaderStages[] = {
+  auto shaderStages = std::vector<VkPipelineShaderStageCreateInfo>{
     vertexShaderStageCreateInfo,
     fragmentShaderStageCreateInfo
   };
@@ -286,7 +292,7 @@ void Viewer::run() {
   VkGraphicsPipelineCreateInfo pipelineCreateInfo{
     .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
     .stageCount = 2,
-    .pStages = shaderStages,
+    .pStages = shaderStages.data(),
     .pVertexInputState = &pipelineVertexInputStateCreateInfo,
     .pInputAssemblyState = &pipelineInputAssemblyStateCreateInfo,
     .pViewportState = &pipelineViewportStateCreateInfo,
@@ -304,6 +310,83 @@ void Viewer::run() {
 
   vkDestroyShaderModule(logicalDevice, fragmentShaderModule, nullptr);
   vkDestroyShaderModule(logicalDevice, vertexShaderModule, nullptr);
+
+  swapChainFramebuffers.resize(swapChainImageViews.size());
+  for (auto i{0}; i < swapChainImageViews.size(); i++) {
+    auto attachments = std::vector<VkImageView>{swapChainImageViews[i]};
+
+    VkFramebufferCreateInfo frameBufferCreateInfo{
+      .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .renderPass = renderPass,
+      .attachmentCount = 1,
+      .pAttachments = attachments.data(),
+      .width = swapExtent.width,
+      .height = swapExtent.height,
+      .layers = 1
+    };
+
+    if (vkCreateFramebuffer(logicalDevice, &frameBufferCreateInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS) {
+      throw std::runtime_error("Could not create frame buffer");
+    }
+  }
+
+  VkCommandPoolCreateInfo commandPoolCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .queueFamilyIndex = 0
+  };
+
+  if (vkCreateCommandPool(logicalDevice, &commandPoolCreateInfo, nullptr, &commandPool) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create command pool!");
+  }
+
+  commandBuffers.resize(swapChainFramebuffers.size());
+
+  VkCommandBufferAllocateInfo commandBufferAllocateInfo{
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .commandPool = commandPool,
+    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = uint32_t(commandBuffers.size())
+  };
+
+  if (vkAllocateCommandBuffers(logicalDevice, &commandBufferAllocateInfo, commandBuffers.data()) != VK_SUCCESS) {
+    throw std::runtime_error("failed to allocate command buffers!");
+  }
+
+  for (auto i{0}; i < commandBuffers.size(); i++) {
+    VkCommandBufferBeginInfo commandBufferBeginInfo{
+      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT
+    };
+
+    if (vkBeginCommandBuffer(commandBuffers[i], &commandBufferBeginInfo) != VK_SUCCESS) {
+        throw std::runtime_error("failed to begin recording command buffer!");
+    }
+
+    VkRect2D renderArea{
+      .offset = {0, 0},
+      .extent = swapExtent
+    };
+
+    VkClearValue clearValue = {0.0f, 0.0f, 0.0f, 1.0f};
+
+    VkRenderPassBeginInfo renderPassBeginInfo{
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+      .renderPass = renderPass,
+      .framebuffer = swapChainFramebuffers[i],
+      .renderArea = renderArea,
+      .clearValueCount = 1,
+      .pClearValues = &clearValue
+    };
+
+    vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+    vkCmdEndRenderPass(commandBuffers[i]);
+
+    if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
+      throw std::runtime_error("failed to record command buffer!");
+    }
+  }
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();

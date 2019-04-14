@@ -25,10 +25,14 @@ private:
   VkSwapchainKHR swapChain;
   std::vector<VkImage> swapChainImages;
   std::vector<VkImageView> swapChainImageViews;
+  std::vector<VkFramebuffer> swapChainFramebuffers;
 
   VkRenderPass renderPass;
   VkPipelineLayout pipelineLayout;
   VkPipeline graphicsPipeline;
+
+  VkCommandPool commandPool;
+  std::vector<VkCommandBuffer> commandBuffers;
 
   std::vector<const char*> logicalDeviceExtensions{
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
