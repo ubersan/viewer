@@ -15,6 +15,25 @@ void Viewer::run() {
 
   glfwSetKeyCallback(window, exit_key_callback); 
 
+  VkApplicationInfo applicationInfo = {
+    .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+    .pApplicationName = "3D Viewer",
+    .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+    .pEngineName = "3D Viewer",
+    .engineVersion = VK_MAKE_VERSION(1, 0, 0),
+    .apiVersion = VK_API_VERSION_1_1
+  };
+
+  VkInstanceCreateInfo instanceCreateInfo = {
+    .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    .pApplicationInfo = &applicationInfo
+  };
+
+  VkInstance instance;
+  if (vkCreateInstance(&instanceCreateInfo, nullptr, &instance) != VK_SUCCESS) {
+    throw std::runtime_error("Could not create VK instance");
+  }
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
