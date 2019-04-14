@@ -1,8 +1,11 @@
 #include "viewer.hpp"
 
 #include <iostream>
+#include <fstream>
 
 Viewer::~Viewer() {
+  vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
+
   for (auto swapChainImageView : swapChainImageViews) {
     vkDestroyImageView(logicalDevice, swapChainImageView, nullptr);
   }
@@ -145,6 +148,107 @@ void Viewer::run() {
     }
   }
 
+  VkShaderModule vertexShaderModule, fragmentShaderModule;
+  createShaderModuleFromBinary("../source/shaders/vert.spv", vertexShaderModule);
+  createShaderModuleFromBinary("../source/shaders/frag.spv", fragmentShaderModule);
+
+  VkPipelineShaderStageCreateInfo vertexShaderStageCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .stage = VK_SHADER_STAGE_VERTEX_BIT,
+    .module = vertexShaderModule,
+    .pName = "main"
+  };
+
+  VkPipelineShaderStageCreateInfo fragmentShaderStageCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+    .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+    .module = fragmentShaderModule,
+    .pName = "main"
+  };
+
+  auto shaderStages = {
+    vertexShaderStageCreateInfo,
+    fragmentShaderStageCreateInfo
+  };
+
+  vkDestroyShaderModule(logicalDevice, fragmentShaderModule, nullptr);
+  vkDestroyShaderModule(logicalDevice, vertexShaderModule, nullptr);
+
+  VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+    .vertexBindingDescriptionCount = 0
+  };
+
+  VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+    .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+    .primitiveRestartEnable = VK_FALSE
+  };
+
+  VkViewport viewport{
+    .x = 0.0f,
+    .y = 0.0f,
+    .width = float(swapExtent.width),
+    .height = float(swapExtent.height),
+    .minDepth = 0.0f,
+    .maxDepth = 1.0f
+  };
+
+  VkRect2D scissor{
+    .offset = {0, 0},
+    .extent = swapExtent
+  };
+
+  VkPipelineViewportStateCreateInfo pipelineViewportStateCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+    .viewportCount = 1,
+    .pViewports = &viewport,
+    .scissorCount = 1,
+    .pScissors = &scissor
+  };
+
+  VkPipelineRasterizationStateCreateInfo pipelineRasterizationStateCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+    .depthClampEnable = VK_FALSE,
+    .rasterizerDiscardEnable = VK_FALSE,
+    .polygonMode = VK_POLYGON_MODE_FILL,
+    .cullMode = VK_CULL_MODE_BACK_BIT,
+    .frontFace = VK_FRONT_FACE_CLOCKWISE,
+    .depthBiasEnable = VK_FALSE,
+    .lineWidth = 1.0f
+  };
+
+  VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+    .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+    .sampleShadingEnable = VK_FALSE,
+    .minSampleShading = 1.0f
+  };
+
+  VkPipelineColorBlendAttachmentState pipelineColorBlendAttachmentState{
+    .blendEnable = VK_FALSE,
+    .colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT
+      | VK_COLOR_COMPONENT_G_BIT
+      | VK_COLOR_COMPONENT_B_BIT
+      | VK_COLOR_COMPONENT_A_BIT    
+  };
+
+  VkPipelineColorBlendStateCreateInfo pipelineColorBlendStateCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+    .logicOpEnable = VK_FALSE,
+    .attachmentCount = 1,
+    .pAttachments = &pipelineColorBlendAttachmentState
+  };
+
+  VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+  };
+
+  if (vkCreatePipelineLayout(logicalDevice, &pipelineLayoutCreateInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
+    throw std::runtime_error("Could not create pipeline layout");
+  }
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
   }
@@ -152,4 +256,29 @@ void Viewer::run() {
 
 void Viewer::exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
   glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
+
+void Viewer::createShaderModuleFromBinary(const std::string& filename, VkShaderModule& shaderModule) {
+  std::ifstream shader{filename, std::ios::ate | std::ios::binary};
+
+  if (!shader.is_open()) {
+    throw std::runtime_error("failed to open shader file!");
+  }
+
+  auto fileSize = size_t{shader.tellg()};
+  std::vector<char> buffer(fileSize);
+
+  shader.seekg(0);
+  shader.read(buffer.data(), fileSize);
+  shader.close();
+
+  VkShaderModuleCreateInfo shaderModuleCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+    .codeSize = buffer.size(),
+    .pCode = reinterpret_cast<const uint32_t*>(buffer.data())
+  };
+
+  if (vkCreateShaderModule(logicalDevice, &shaderModuleCreateInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+    throw std::runtime_error("Could not create shader module");
+  }
 }

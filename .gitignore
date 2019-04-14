@@ -2,3 +2,4 @@ build
 .vscode
 glfw-3.2.1
 vulkan
+shaderc
