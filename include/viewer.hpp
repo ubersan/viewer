@@ -13,6 +13,8 @@ private:
   uint32_t width{640};
   uint32_t height{480};
 
+  const int MAX_FRAMES_IN_FLIGHT{2};
+
   GLFWwindow* window;
 
   VkInstance vkInstance;
@@ -38,6 +40,12 @@ private:
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
   };
 
+  std::vector<VkSemaphore> imageAvailableSemaphores;
+  std::vector<VkSemaphore> renderFinishedSemaphores;
+  std::vector<VkFence> inFlightFences;
+  size_t currentFrame{0};
+
+  void drawFrame();
   void createShaderModuleFromBinary(const std::string& filename, VkShaderModule& shaderModule);
 
   static void exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);

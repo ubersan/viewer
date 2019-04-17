@@ -2,8 +2,15 @@
 
 #include <iostream>
 #include <fstream>
+#include <limits>
 
 Viewer::~Viewer() {
+  for (auto i = size_t{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    vkDestroySemaphore(logicalDevice, renderFinishedSemaphores[i], nullptr);
+    vkDestroySemaphore(logicalDevice, imageAvailableSemaphores[i], nullptr);
+    vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
+  }
+
   vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 
   for (auto framebuffer : swapChainFramebuffers) {
@@ -179,12 +186,23 @@ void Viewer::run() {
     .pColorAttachments = &attachmentReference
   };
 
+  VkSubpassDependency subpassDependency{
+    .srcSubpass = VK_SUBPASS_EXTERNAL,
+    .dstSubpass = 0,
+    .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    .srcAccessMask = 0,
+    .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+  };
+
   VkRenderPassCreateInfo renderPassCreateInfo{
     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
     .attachmentCount = 1,
     .pAttachments = &attachmentDescription,
     .subpassCount = 1,
-    .pSubpasses = &subpassDescription
+    .pSubpasses = &subpassDescription,
+    .dependencyCount = 1,
+    .pDependencies = &subpassDependency
   };
 
   if (vkCreateRenderPass(logicalDevice, &renderPassCreateInfo, nullptr, &renderPass) != VK_SUCCESS) {
@@ -388,13 +406,79 @@ void Viewer::run() {
     }
   }
 
+  VkSemaphoreCreateInfo semaphoreCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+  };
+
+  VkFenceCreateInfo fenceCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT
+  };
+
+  imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+  for (auto i = size_t{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS
+        || vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS
+        || vkCreateFence(logicalDevice, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+          throw std::runtime_error("failed to record command buffer!");
+    }
+  }
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+    drawFrame();
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
+
+  vkDeviceWaitIdle(logicalDevice);
+}
+
+void Viewer::drawFrame() {
+  vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+
+  auto imageIndex = uint32_t{0};
+  vkAcquireNextImageKHR(logicalDevice, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+  std::vector<VkSemaphore> waitSemaphores{imageAvailableSemaphores[currentFrame]};
+  std::vector<VkPipelineStageFlags> waitStages{VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  std::vector<VkSemaphore> signalSemaphores{renderFinishedSemaphores[currentFrame]};
+
+  VkSubmitInfo submitInfo{
+    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    .waitSemaphoreCount = 1,
+    .pWaitSemaphores = waitSemaphores.data(),
+    .pWaitDstStageMask = waitStages.data(),
+    .commandBufferCount = 1,
+    .pCommandBuffers = &commandBuffers[imageIndex],
+    .signalSemaphoreCount = 1,
+    .pSignalSemaphores = signalSemaphores.data()
+  };
+
+  if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
+      throw std::runtime_error("failed to submit draw command buffer!");
+  }
+
+  VkSwapchainKHR swapChains[] = {swapChain};
+  VkPresentInfoKHR presentInfo = {
+    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+    .waitSemaphoreCount = 1,
+    .pWaitSemaphores = signalSemaphores.data(),
+    .swapchainCount = 1,
+    .pSwapchains = swapChains,
+    .pImageIndices = &imageIndex,
+  };
+
+  vkQueuePresentKHR(presentationQueue, &presentInfo);
 }
 
 void Viewer::exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  glfwSetWindowShouldClose(window, GLFW_TRUE);
+  if (key == GLFW_KEY_ESCAPE) {
+    glfwSetWindowShouldClose(window, GLFW_TRUE);
+  }
 }
 
 void Viewer::createShaderModuleFromBinary(const std::string& filename, VkShaderModule& shaderModule) {
