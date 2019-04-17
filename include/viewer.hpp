@@ -38,6 +38,10 @@ private:
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
   };
 
+  VkSemaphore imageAvailableSemaphore;
+  VkSemaphore renderFinishedSemaphore;
+
+  void drawFrame();
   void createShaderModuleFromBinary(const std::string& filename, VkShaderModule& shaderModule);
 
   static void exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
