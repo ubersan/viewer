@@ -460,7 +460,9 @@ void Viewer::drawFrame() {
 }
 
 void Viewer::exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  glfwSetWindowShouldClose(window, GLFW_TRUE);
+  if (key == GLFW_KEY_ESCAPE) {
+    glfwSetWindowShouldClose(window, GLFW_TRUE);
+  }
 }
 
 void Viewer::createShaderModuleFromBinary(const std::string& filename, VkShaderModule& shaderModule) {
