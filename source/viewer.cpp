@@ -38,6 +38,11 @@ Viewer::~Viewer() {
 void Viewer::run() {
   glfwInit();
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+
+  auto glfwVideoMode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+  width = 0.8 * glfwVideoMode->width;
+  height = 0.8 * glfwVideoMode->height;
+
   window = glfwCreateWindow(width, height, "3D Viewer", nullptr, nullptr);
 
   glfwSetKeyCallback(window, exit_key_callback); 
