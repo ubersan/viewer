@@ -417,6 +417,8 @@ void Viewer::run() {
     glfwPollEvents();
     drawFrame();
   }
+
+  vkDeviceWaitIdle(logicalDevice);
 }
 
 void Viewer::drawFrame() {
