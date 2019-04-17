@@ -5,8 +5,11 @@
 #include <limits>
 
 Viewer::~Viewer() {
-  vkDestroySemaphore(logicalDevice, renderFinishedSemaphore, nullptr);
-  vkDestroySemaphore(logicalDevice, imageAvailableSemaphore, nullptr);
+  for (auto i = size_t{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    vkDestroySemaphore(logicalDevice, renderFinishedSemaphores[i], nullptr);
+    vkDestroySemaphore(logicalDevice, imageAvailableSemaphores[i], nullptr);
+    vkDestroyFence(logicalDevice, inFlightFences[i], nullptr);
+  }
 
   vkDestroyCommandPool(logicalDevice, commandPool, nullptr);
 
@@ -407,26 +410,42 @@ void Viewer::run() {
     .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
   };
 
-  if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS
-      || vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
+  VkFenceCreateInfo fenceCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+    .flags = VK_FENCE_CREATE_SIGNALED_BIT
+  };
+
+  imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+  inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+
+  for (auto i = size_t{0}; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    if (vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS
+        || vkCreateSemaphore(logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS
+        || vkCreateFence(logicalDevice, &fenceCreateInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
+          throw std::runtime_error("failed to record command buffer!");
+    }
   }
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     drawFrame();
+
+    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
 
   vkDeviceWaitIdle(logicalDevice);
 }
 
 void Viewer::drawFrame() {
-  auto imageIndex = uint32_t{0};
-  vkAcquireNextImageKHR(logicalDevice, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+  vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-  std::vector<VkSemaphore> waitSemaphores{imageAvailableSemaphore};
+  auto imageIndex = uint32_t{0};
+  vkAcquireNextImageKHR(logicalDevice, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+  std::vector<VkSemaphore> waitSemaphores{imageAvailableSemaphores[currentFrame]};
   std::vector<VkPipelineStageFlags> waitStages{VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  std::vector<VkSemaphore> signalSemaphores{renderFinishedSemaphore};
+  std::vector<VkSemaphore> signalSemaphores{renderFinishedSemaphores[currentFrame]};
 
   VkSubmitInfo submitInfo{
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -439,7 +458,7 @@ void Viewer::drawFrame() {
     .pSignalSemaphores = signalSemaphores.data()
   };
 
-  if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
+  if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
       throw std::runtime_error("failed to submit draw command buffer!");
   }
 
