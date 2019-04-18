@@ -228,7 +228,7 @@ void Viewer::createSwapChain() {
   vkGetSwapchainImagesKHR(logicalDevice, swapChain, &swapChainImageCount, swapChainImages.data());
 
   swapChainImageViews.resize(swapChainImages.size());
-  for (auto i{0}; i < swapChainImages.size(); i++) {
+  for (auto i = size_t{0}; i < swapChainImages.size(); i++) {
     VkComponentMapping componentMapping{
       .r = VK_COMPONENT_SWIZZLE_IDENTITY,
       .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -424,7 +424,7 @@ void Viewer::createSwapChain() {
   vkDestroyShaderModule(logicalDevice, vertexShaderModule, nullptr);
 
   swapChainFramebuffers.resize(swapChainImageViews.size());
-  for (auto i{0}; i < swapChainImageViews.size(); i++) {
+  for (auto i = size_t{0}; i < swapChainImageViews.size(); i++) {
     auto attachments = std::vector<VkImageView>{swapChainImageViews[i]};
 
     VkFramebufferCreateInfo frameBufferCreateInfo{
@@ -464,7 +464,7 @@ void Viewer::createSwapChain() {
     throw std::runtime_error("failed to allocate command buffers!");
   }
 
-  for (auto i{0}; i < commandBuffers.size(); i++) {
+  for (auto i = size_t{0}; i < commandBuffers.size(); i++) {
     VkCommandBufferBeginInfo commandBufferBeginInfo{
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
       .flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT

@@ -13,7 +13,7 @@ private:
   uint32_t width{640};
   uint32_t height{480};
 
-  const int MAX_FRAMES_IN_FLIGHT{2};
+  const size_t MAX_FRAMES_IN_FLIGHT{2};
 
   GLFWwindow* window;
 
