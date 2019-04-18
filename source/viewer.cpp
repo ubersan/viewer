@@ -121,8 +121,6 @@ void Viewer::run() {
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
     drawFrame();
-
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
   }
 
   vkDeviceWaitIdle(logicalDevice);
@@ -132,12 +130,12 @@ void Viewer::drawFrame() {
   vkWaitForFences(logicalDevice, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
 
   auto imageIndex = uint32_t{0};
-  auto result = vkAcquireNextImageKHR(logicalDevice, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+  auto acquireNextImageResult = vkAcquireNextImageKHR(logicalDevice, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-  if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+  if (acquireNextImageResult == VK_ERROR_OUT_OF_DATE_KHR) {
       recreateSwapChain();
       return;
-  } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+  } else if (acquireNextImageResult != VK_SUCCESS && acquireNextImageResult != VK_SUBOPTIMAL_KHR) {
       throw std::runtime_error("failed to acquire swap chain image!");
   }
 
@@ -172,18 +170,19 @@ void Viewer::drawFrame() {
     .pImageIndices = &imageIndex,
   };
 
-  result = vkQueuePresentKHR(presentationQueue, &presentInfo);
+  auto queuePresentResult = vkQueuePresentKHR(presentationQueue, &presentInfo);
 
-  if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || resizeHappended) {
+  if (queuePresentResult == VK_ERROR_OUT_OF_DATE_KHR || queuePresentResult == VK_SUBOPTIMAL_KHR || resizeHappended) {
     resizeHappended = false;
     recreateSwapChain();
-  } else if (result != VK_SUCCESS) {
+  } else if (queuePresentResult != VK_SUCCESS) {
       throw std::runtime_error("failed to present swap chain image!");
   }
+
+  currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void Viewer::recreateSwapChain() {
-  std::cout << "recrete swap chain" << std::endl;
   vkDeviceWaitIdle(logicalDevice);
 
   cleanupSwapChain();
@@ -194,9 +193,10 @@ void Viewer::createSwapChain() {
   VkSurfaceFormatKHR surfaceFormat{VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
   VkPresentModeKHR presentationMode{VK_PRESENT_MODE_FIFO_KHR};
 
-  int newWidth, newHeight;
+  auto newWidth = int{0};
+  auto newHeight = int{0};
   glfwGetFramebufferSize(window, &newWidth, &newHeight);
-  VkExtent2D swapExtent{newWidth, newHeight};
+  VkExtent2D swapExtent{uint32_t(newWidth), uint32_t(newHeight)};
 
   VkSurfaceCapabilitiesKHR surfaceCapabilities;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities);
