@@ -45,7 +45,7 @@ private:
   std::vector<VkFence> inFlightFences;
   size_t currentFrame{0};
 
-  bool resizeHappended = false;
+  bool resizeHappended{false};
 
   void drawFrame();
   void createSwapChain();
@@ -53,6 +53,6 @@ private:
   void cleanupSwapChain();
   void createShaderModuleFromBinary(const std::string& filename, VkShaderModule& shaderModule);
 
-  static void exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+  static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
   static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
 };

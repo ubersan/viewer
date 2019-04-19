@@ -34,7 +34,7 @@ void Viewer::run() {
   window = glfwCreateWindow(width, height, "3D Viewer", nullptr, nullptr);
 
   glfwSetWindowUserPointer(window, this);
-  glfwSetKeyCallback(window, exit_key_callback);
+  glfwSetKeyCallback(window, key_callback);
   glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 
   VkApplicationInfo applicationInfo{
@@ -518,9 +518,11 @@ void Viewer::cleanupSwapChain() {
   vkDestroySwapchainKHR(logicalDevice, swapChain, nullptr);
 }
 
-void Viewer::exit_key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  if (key == GLFW_KEY_ESCAPE) {
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
+void Viewer::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+  switch (key) {
+    case GLFW_KEY_ESCAPE:
+      glfwSetWindowShouldClose(window, GLFW_TRUE);
+      break;
   }
 }
 
