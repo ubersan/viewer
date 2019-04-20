@@ -1,6 +1,13 @@
 # Simple 3D Viewer
 
-Build and run:
+## Compile shaders
+
+```
+/vulkan/1.1.101.0/x86_64/bin/glslangValidator -V /source/shaders/basic.[vert|frag]
+```
+
+## Build and run
+
 ```
 mkdir build
 cd build

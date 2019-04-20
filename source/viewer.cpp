@@ -37,6 +37,12 @@ void Viewer::run() {
   glfwSetKeyCallback(window, key_callback);
   glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
 
+  vertices = std::vector<Vertex>{
+    {{0.0f, -0.5f}, {1.0f, 1.0f, 1.0f}},
+    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+  };
+
   VkApplicationInfo applicationInfo{
     .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
     .pApplicationName = "3D Viewer",
@@ -326,9 +332,15 @@ void Viewer::createSwapChain() {
     fragmentShaderStageCreateInfo
   };
 
+  auto vertexBindingDescription = Vertex::getBindingDescription();
+  auto vertexAttributeDescriptions = Vertex::getAttributeDescriptions();
+
   VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
     .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-    .vertexBindingDescriptionCount = 0
+    .vertexBindingDescriptionCount = 1,
+    .pVertexBindingDescriptions = &vertexBindingDescription,
+    .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttributeDescriptions.size()),
+    .pVertexAttributeDescriptions = vertexAttributeDescriptions.data()
   };
 
   VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{
@@ -451,6 +463,54 @@ void Viewer::createSwapChain() {
     throw std::runtime_error("failed to create command pool!");
   }
 
+  VkBufferCreateInfo bufferCreateInfo{
+    .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .size = sizeof(vertices[0]) * vertices.size(),
+    .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+  };
+
+  if (vkCreateBuffer(logicalDevice, &bufferCreateInfo, nullptr, &vertexBuffer) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create vertex buffer!");
+  }
+
+  VkMemoryRequirements memoryRequirements;
+  vkGetBufferMemoryRequirements(logicalDevice, vertexBuffer, &memoryRequirements);
+
+  VkPhysicalDeviceMemoryProperties physicalMemoryProperties;
+  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &physicalMemoryProperties);
+
+  auto memoryTypeIndex = uint32_t{0};
+  for (; memoryTypeIndex < physicalMemoryProperties.memoryTypeCount; memoryTypeIndex++) {
+    if (memoryRequirements.memoryTypeBits & (1 << memoryTypeIndex)
+        && physicalMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags
+            & (VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+      ) {
+        break;
+      }
+  }
+
+  if (memoryTypeIndex == physicalMemoryProperties.memoryTypeCount) {
+    throw std::runtime_error("failed to find suitable GPU memory type!");
+  }
+
+  VkMemoryAllocateInfo memoryAllocateInfo{
+    .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+    .allocationSize = memoryRequirements.size,
+    .memoryTypeIndex = memoryTypeIndex
+  };
+
+  if (vkAllocateMemory(logicalDevice, &memoryAllocateInfo, nullptr, &vertexBufferMemory) != VK_SUCCESS) {
+    throw std::runtime_error("failed to create vertex buffer memory!");
+  }
+
+  vkBindBufferMemory(logicalDevice, vertexBuffer, vertexBufferMemory, 0);
+
+  void* vertexData;
+  vkMapMemory(logicalDevice, vertexBufferMemory, 0, bufferCreateInfo.size, 0, &vertexData);
+  memcpy(vertexData, vertices.data(), (size_t) bufferCreateInfo.size);
+  vkUnmapMemory(logicalDevice, vertexBufferMemory);
+
   commandBuffers.resize(swapChainFramebuffers.size());
 
   VkCommandBufferAllocateInfo commandBufferAllocateInfo{
@@ -492,7 +552,12 @@ void Viewer::createSwapChain() {
 
     vkCmdBeginRenderPass(commandBuffers[i], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+
+    auto vertexBuffers = std::vector<VkBuffer>{vertexBuffer};
+    auto offsets = std::vector<VkDeviceSize>{0};
+    vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers.data(), offsets.data());
+
+    vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
     vkCmdEndRenderPass(commandBuffers[i]);
 
     if (vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
@@ -506,10 +571,13 @@ void Viewer::cleanupSwapChain() {
       vkDestroyFramebuffer(logicalDevice, framebuffer, nullptr);
   }
 
+  vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
+  vkFreeMemory(logicalDevice, vertexBufferMemory, nullptr);
+  vkDestroyBuffer(logicalDevice, vertexBuffer, nullptr);
+
   vkDestroyPipeline(logicalDevice, graphicsPipeline, nullptr);
   vkDestroyPipelineLayout(logicalDevice, pipelineLayout, nullptr);
   vkDestroyRenderPass(logicalDevice, renderPass, nullptr);
-
 
   for (auto swapChainImageView : swapChainImageViews) {
     vkDestroyImageView(logicalDevice, swapChainImageView, nullptr);

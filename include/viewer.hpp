@@ -4,6 +4,8 @@
 #include <vector>
 #include <string>
 
+#include "vertex.hpp"
+
 class Viewer {
 public:
   ~Viewer();
@@ -46,6 +48,10 @@ private:
   size_t currentFrame{0};
 
   bool resizeHappended{false};
+
+  std::vector<Vertex> vertices;
+  VkBuffer vertexBuffer;
+  VkDeviceMemory vertexBufferMemory;
 
   void drawFrame();
   void createSwapChain();
