@@ -53,6 +53,10 @@ private:
   VkBuffer vertexBuffer;
   VkDeviceMemory vertexBufferMemory;
 
+  std::vector<const char*> validationLayers{
+    "VK_LAYER_LUNARG_standard_validation"
+  };
+
   void drawFrame();
   void createSwapChain();
   void recreateSwapChain();
@@ -61,4 +65,12 @@ private:
 
   static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
   static void framebufferResizeCallback(GLFWwindow* window, int width, int height);
+
+  VkDebugUtilsMessengerEXT debugMessenger;
+  static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+    void* pUserData
+  );
 };
